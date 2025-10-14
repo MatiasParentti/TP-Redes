@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "server": "node server/index.js",
-    "client": "node client/cli.js"
+    "server": "node server/server.js",
+    "client": "node client/clients.js"
   },
   "dependencies": {
     "chalk": "^4.1.2",
