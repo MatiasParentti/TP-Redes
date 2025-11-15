@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Chat WS</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 20px;}
+    #log { height: 300px; overflow:auto; border:1px solid #ddd; padding:8px; margin-bottom:8px; }
+    #controls { display:flex; gap:8px; margin-bottom:8px; }
+    input[type=text]{ flex:1; padding:6px;}
+    button{ padding:6px 10px;}
+    #status { font-size:0.9em; color:green;}
+  </style>
+</head>
+<body>
+  <h2>Chat WebSocket (demo)</h2>
+
+  <div>
+    <label>Usuario (para login): <input id="loginUser" type="text" placeholder="ej: matias" /></label>
+    <button id="btnLogin">Obtener JWT y conectar</button>
+    <span id="status"></span>
+  </div>
+
+  <div id="log"></div>
+
+  <div id="controls" style="display:none;">
+    <input id="inputMsg" placeholder="Escribe mensaje o comando (ej /join sala1)" />
+    <button id="btnSend">Enviar</button>
+    <button id="btnLista">/lista</button>
+    <button id="btnSalas">/salas</button>
+  </div>
+
+  <script src="/public/chat.js"></script>
+</body>
+</html>

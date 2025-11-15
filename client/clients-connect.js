@@ -1,20 +1,20 @@
 const clients = new Map();
 
-export function addClient(socket) {
-  clients.set(socket, { user: null, room: null });
+export function addClient(ws) {
+  clients.set(ws, { user: null, room: null });
 }
 
-export function removeClient(socket) {
-  clients.delete(socket);
+export function removeClient(ws) {
+  clients.delete(ws);
 }
 
-export function setUser(socket, user) {
-  const c = clients.get(socket);
+export function setUser(ws, user) {
+  const c = clients.get(ws);
   if (c) c.user = user;
 }
 
-export function setRoom(socket, room) {
-  const c = clients.get(socket);
+export function setRoom(ws, room) {
+  const c = clients.get(ws);
   if (c) c.room = room;
 }
 
@@ -22,12 +22,12 @@ export function getClients() {
   return Array.from(clients.keys());
 }
 
-export function getClientInfo(socket) {
-  return clients.get(socket);
+export function getClientInfo(ws) {
+  return clients.get(ws);
 }
 
 export function getClientsInRoom(room) {
   return Array.from(clients.entries())
     .filter(([_, c]) => c.room === room)
-    .map(([s, c]) => ({ socket: s, ...c }));
+    .map(([socket, c]) => ({ socket, ...c }));
 }
