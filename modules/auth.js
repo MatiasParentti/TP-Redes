@@ -1,18 +1,38 @@
 import jwt from "jsonwebtoken";
 import { setUser } from "../client/clients-connect.js";
 
-let JWT_SECRET = "changeme";
+let JWT_SECRET = "river_plate";
 const TOKEN_TTL = process.env.JWT_TTL || "2h";
 
+const MOCK_USERS = [
+  { username: "admin", password: "admin123", displayName: "Administrador" },
+  { username: "usuario1", password: "pass123", displayName: "Usuario Uno" },
+  { username: "usuario2", password: "pass123", displayName: "Usuario Dos" },
+  { username: "test", password: "test", displayName: "Usuario Test" },
+  { username: "matias", password: "123456", displayName: "Matías" },
+  { username: "ana", password: "abcdef", displayName: "Ana" },
+];
+
 export const handleAuth = {
+  
   init(secret) {
-    JWT_SECRET = secret || "changeme";
+    JWT_SECRET = secret || "river_plate";
   },
 
+  // Autentica usuario
+  authenticateUser(username, password) {
+    const user = MOCK_USERS.find(
+      (u) => u.username === username && u.password === password
+    );
+    return user ? this.generateToken(user.username) : null;
+  },
+
+  // Genera token JWT para un usuario
   generateToken(user) {
     return jwt.sign({ user }, JWT_SECRET, { expiresIn: TOKEN_TTL });
   },
 
+  // Verifica validez de un token
   verifyToken(token) {
     try {
       const payload = jwt.verify(token, JWT_SECRET);
@@ -22,29 +42,50 @@ export const handleAuth = {
     }
   },
 
+  // Procesa autenticación WebSocket
   processAuth(ws, msgObj) {
-    const token = msgObj.token;
+    const { token, user } = msgObj;
 
     if (!token) {
-      if (msgObj.user) {
-        
-        setUser(ws, msgObj.user);
-        ws.send(JSON.stringify({ type: "system", body: `Autenticado como ${msgObj.user} (DEV modo)` }));
-        return;
+      if (user) {
+        const userExists = MOCK_USERS.some((u) => u.username === user);
+        if (userExists) {
+          setUser(ws, user);
+          ws.send(
+            JSON.stringify({
+              type: "system",
+              body: `Autenticado como ${user} (DEV modo)`,
+            })
+          );
+        } else {
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              body: `Usuario ${user} no existe. Usuarios disponibles: ${MOCK_USERS.map((u) => u.username).join(", ")}`,
+            })
+          );
+        }
+      } else {
+        ws.send(
+          JSON.stringify({ type: "error", body: "Se requiere token JWT" })
+        );
       }
-      ws.send(JSON.stringify({ type: "error", body: "Se requiere token JWT" }));
       return;
     }
 
     try {
       const payload = jwt.verify(token, JWT_SECRET);
       setUser(ws, payload.user);
-      ws.send(JSON.stringify({
-        type: "system",
-        body: `Autenticado como ${payload.user}`
-      }));
+      ws.send(
+        JSON.stringify({
+          type: "system",
+          body: `Autenticado como ${payload.user}`,
+        })
+      );
     } catch (err) {
-      ws.send(JSON.stringify({ type: "error", body: "JWT inválido: " + err.message }));
+      ws.send(
+        JSON.stringify({ type: "error", body: "JWT inválido: " + err.message })
+      );
     }
-  }
+  },
 };

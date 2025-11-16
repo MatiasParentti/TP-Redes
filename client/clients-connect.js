@@ -1,33 +1,41 @@
+// Mapa de clientes conectados
 const clients = new Map();
 
+// Agrega un nuevo cliente al mapa
 export function addClient(ws) {
   clients.set(ws, { user: null, room: null });
 }
 
+// Elimina un cliente del mapa
 export function removeClient(ws) {
   clients.delete(ws);
 }
 
+// Asigna nombre de usuario al cliente
 export function setUser(ws, user) {
   const c = clients.get(ws);
   if (c) c.user = user;
 }
 
+// Asigna sala actual al cliente
 export function setRoom(ws, room) {
   const c = clients.get(ws);
   if (c) c.room = room;
 }
 
+// Devuelve todos los sockets conectados
 export function getClients() {
-  return Array.from(clients.keys());
+  return [...clients.keys()];
 }
 
+// Devuelve la info del cliente asociado al socket
 export function getClientInfo(ws) {
   return clients.get(ws);
 }
 
+// Devuelve los clientes que están en una sala específica
 export function getClientsInRoom(room) {
-  return Array.from(clients.entries())
-    .filter(([_, c]) => c.room === room)
+  return [...clients.entries()]
+    .filter(([, c]) => c.room === room)
     .map(([socket, c]) => ({ socket, ...c }));
 }

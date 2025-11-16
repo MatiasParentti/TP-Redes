@@ -9,11 +9,7 @@ import { WebSocketServer } from "ws";
 import {
   addClient,
   removeClient,
-  setUser,
-  setRoom,
-  getClients,
   getClientInfo,
-  getClientsInRoom,
 } from "../client/clients-connect.js";
 
 import { handleAuth } from "../modules/auth.js";
@@ -22,37 +18,50 @@ import {
   handlePrivateMessage,
   handleBroadcastMessage,
 } from "../modules/messages.js";
-import { rooms, joinRoom, leaveRoom, getRoomList } from "../modules/rooms.js";
+import {
+  rooms,
+  joinRoom,
+  leaveRoom,
+  getRoomList,
+  cleanupUserRooms,
+  getClientsInRoom,
+} from "../modules/rooms.js";
+
 import { logEvent } from "../util/logger.js";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const APP_PORT = process.env.PORT_HTTP || 4000;
 
 const app = express();
 app.use(express.json());
 
-app.use("/public", express.static(path.join(__dirname, "..", "public")));
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+// CORS
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  next();
 });
 
 //login
 app.post("/login", (req, res) => {
-  const { user } = req.body;
-  if (!user) return res.status(400).json({ error: "user required" });
+  const { user, password } = req.body;
+  if (!user || !password)
+    return res.status(400).json({ error: "Usuario y contraseña requeridos" });
 
-  const token = handleAuth.generateToken(user);
+  const token = handleAuth.authenticateUser(user, password);
+  if (!token) return res.status(401).json({ error: "Credenciales inválidas" });
+
   res.json({ token });
 });
 
+// Token JWT
 app.post("/token/verify", (req, res) => {
   const { token } = req.body;
-  const result = handleAuth.verifyToken(token);
-  res.json(result);
+  res.json(handleAuth.verifyToken(token));
 });
 
 const server = http.createServer(app);
@@ -60,14 +69,17 @@ const wss = new WebSocketServer({ server });
 
 handleAuth.init(process.env.JWT_SECRET);
 
+// salas x comando
 const roomsManager = {
-  rooms, // Map de rooms
-  joinRoom, // función joinRoom
-  leaveRoom, // función leaveRoom
-  getRoomList, // función getRoomList
-  getClientsInRoom, // función para obtener clientes en sala
+  rooms,
+  joinRoom,
+  leaveRoom,
+  getRoomList,
+  getClientsInRoom,
+  cleanupUserRooms,
 };
 
+// Conexión WebSocket
 wss.on("connection", (ws, req) => {
   const ip = req.socket.remoteAddress;
   const port = req.socket.remotePort;
@@ -87,7 +99,7 @@ wss.on("connection", (ws, req) => {
 
     try {
       msgObj = JSON.parse(raw.toString());
-    } catch (err) {
+    } catch {
       ws.send(JSON.stringify({ type: "error", body: "JSON inválido" }));
       return;
     }
@@ -106,30 +118,29 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
-    if (msgObj.type === "command") {
-      handleCommand(ws, client, msgObj.command, roomsManager);
-      return;
+    switch (msgObj.type) {
+      case "command":
+        handleCommand(ws, client, msgObj.command, roomsManager);
+        break;
+      case "private":
+        handlePrivateMessage(ws, client, msgObj.to, msgObj.body);
+        break;
+      case "message":
+        handleBroadcastMessage(ws, client, msgObj.body);
+        break;
+      default:
+        ws.send(
+          JSON.stringify({ type: "error", body: "Tipo de mensaje desconocido" })
+        );
     }
-
-    if (msgObj.type === "private") {
-      handlePrivateMessage(ws, client, msgObj.to, msgObj.body);
-      return;
-    }
-
-    if (msgObj.type === "message") {
-      handleBroadcastMessage(ws, client, msgObj.body);
-      return;
-    }
-
-    ws.send(
-      JSON.stringify({ type: "error", body: "Tipo de mensaje desconocido" })
-    );
   });
 
   ws.on("close", () => {
     const client = getClientInfo(ws);
-    if (client?.room) {
-      roomsManager.leaveRoom(ws, client, false);
+    if (client) {
+      console.log(`🔌 Usuario desconectado: ${client.user}`);
+      if (client.user) roomsManager.cleanupUserRooms(client.user);
+      if (client.room) roomsManager.leaveRoom(ws, client, false);
     }
     removeClient(ws);
   });
@@ -141,5 +152,4 @@ wss.on("connection", (ws, req) => {
 
 server.listen(APP_PORT, () => {
   console.log(chalk.green(`Servidor listo → http://localhost:${APP_PORT}`));
-  console.log(chalk.gray(`Archivos estáticos: /public`));
 });

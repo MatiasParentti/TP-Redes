@@ -1,9 +1,12 @@
-import { getClients, getClientInfo, setUser, setRoom } from "../client/clients-connect.js";
+import {
+  getClients,
+  getClientInfo,
+  setUser,
+} from "../client/clients-connect.js";
 
+// Procesa comandos
 export function handleCommand(ws, client, command, roomsManager) {
-  const parts = command.split(" ");
-  const baseCommand = parts[0];
-  const args = parts.slice(1);
+  const [baseCommand, ...args] = command.split(" ");
 
   switch (baseCommand) {
     case "/lista":
@@ -11,11 +14,9 @@ export function handleCommand(ws, client, command, roomsManager) {
       break;
 
     case "/join":
-      if (args.length < 1) {
-        ws.send(JSON.stringify({ type: "error", body: "Uso: /join <sala>" }));
-        return;
-      }
-      roomsManager.joinRoom(ws, client, args[0]);
+      args[0]
+        ? roomsManager.joinRoom(ws, client, args[0])
+        : ws.send(JSON.stringify({ type: "error", body: "Uso: /join <sala>" }));
       break;
 
     case "/salas":
@@ -23,11 +24,11 @@ export function handleCommand(ws, client, command, roomsManager) {
       break;
 
     case "/nick":
-      if (args.length < 1) {
-        ws.send(JSON.stringify({ type: "error", body: "Uso: /nick <nuevo_apodo>" }));
-        return;
-      }
-      handleNickChange(ws, client, args[0], roomsManager.rooms);
+      args[0]
+        ? handleNickChange(ws, client, args[0], roomsManager.rooms)
+        : ws.send(
+            JSON.stringify({ type: "error", body: "Uso: /nick <nuevo_apodo>" })
+          );
       break;
 
     case "/leave":
@@ -44,21 +45,23 @@ export function handleCommand(ws, client, command, roomsManager) {
   }
 }
 
+// Lista todos los usuarios conectados
 function handleListUsers(ws) {
   const names = getClients()
-    .map(s => getClientInfo(s).user || "anon")
+    .map((s) => getClientInfo(s).user || "anon")
     .join(", ");
   ws.send(JSON.stringify({ type: "system", body: `Usuarios: ${names}` }));
 }
 
+// Lista todas las salas activas
 function handleListRooms(ws, roomsManager) {
   const list = roomsManager.getRoomList();
-  ws.send(JSON.stringify({ type: "system", body: list || "No hay salas activas" }));
+  ws.send(JSON.stringify({ type: "system", body: list }));
 }
 
+// Cambia el apodo del usuario
 function handleNickChange(ws, client, newNick, rooms) {
-  // Verificar si el nick ya está en uso
-  const nickInUse = getClients().some(s => {
+  const nickInUse = getClients().some((s) => {
     const info = getClientInfo(s);
     return info.user === newNick && s !== ws;
   });
@@ -71,7 +74,6 @@ function handleNickChange(ws, client, newNick, rooms) {
   const oldNick = client.user;
   setUser(ws, newNick);
 
- 
   if (client.room) {
     const roomUsers = rooms.get(client.room);
     if (roomUsers) {
@@ -80,5 +82,7 @@ function handleNickChange(ws, client, newNick, rooms) {
     }
   }
 
-  ws.send(JSON.stringify({ type: "system", body: `Apodo cambiado a: ${newNick}` }));
+  ws.send(
+    JSON.stringify({ type: "system", body: `Apodo cambiado a: ${newNick}` })
+  );
 }
