@@ -10,6 +10,18 @@ import {
   getClientsInRoom,
 } from "../client/clients-connect.js";
 import { logEvent } from "../util/logger.js";
+import fs from "fs";
+import path from "path";
+
+// Ruta relativa a la carpeta actual
+const logsPath = path.resolve("../server", "logs");
+
+if (!fs.existsSync(logsPath)) {
+  fs.mkdirSync(logsPath, { recursive: true });
+  console.log(`📁 Carpeta creada: ${logsPath}`);
+} else {
+  console.log(`✅ Carpeta existente: ${logsPath}`);
+}
 
 const PORT = process.env.PORT_TCP || 7000;
 const rooms = new Map();
