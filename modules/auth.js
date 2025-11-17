@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { setUser } from "../client/clients-connect.js";
+import { logEvent } from "../util/logger.js";
 
 let JWT_SECRET = "river_plate";
 const TOKEN_TTL = process.env.JWT_TTL || "2h";
@@ -57,6 +58,7 @@ export const handleAuth = {
               body: `Autenticado como ${user} (DEV modo)`,
             })
           );
+          logEvent("AUTH", user, null, null, "Autenticación DEV exitosa");
         } else {
           ws.send(
             JSON.stringify({
@@ -82,10 +84,12 @@ export const handleAuth = {
           body: `Autenticado como ${payload.user}`,
         })
       );
+      logEvent("AUTH", payload.user, null, null, "Autenticación JWT exitosa");
     } catch (err) {
       ws.send(
         JSON.stringify({ type: "error", body: "JWT inválido: " + err.message })
       );
+      logEvent("ERROR", null, null, null, `JWT inválido: ${err.message}`);
     }
   },
 };

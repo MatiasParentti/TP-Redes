@@ -1,14 +1,24 @@
+import { logEvent } from "../util/logger.js";
+
 // Mapa de clientes conectados
 const clients = new Map();
 
 // Agrega un nuevo cliente al mapa
 export function addClient(ws) {
   clients.set(ws, { user: null, room: null });
+  // registro estructurado: nuevo socket añadido (sin usuario todavía)
+  logEvent("CONNECT", null, null, null, "Nuevo cliente añadido al mapa");
 }
 
 // Elimina un cliente del mapa
 export function removeClient(ws) {
+  const info = clients.get(ws);
   clients.delete(ws);
+  if (info?.user) {
+    logEvent("DISCONNECT", info.user, null, null, "Cliente eliminado del mapa");
+  } else {
+    logEvent("DISCONNECT", null, null, null, "Socket eliminado del mapa");
+  }
 }
 
 // Asigna nombre de usuario al cliente

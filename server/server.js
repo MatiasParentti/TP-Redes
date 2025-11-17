@@ -5,13 +5,12 @@ import chalk from "chalk";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
-
+import os from 'os';
 import {
   addClient,
   removeClient,
   getClientInfo,
 } from "../client/clients-connect.js";
-
 import { handleAuth } from "../modules/auth.js";
 import { handleCommand } from "../modules/commands.js";
 import {
@@ -26,14 +25,50 @@ import {
   cleanupUserRooms,
   getClientsInRoom,
 } from "../modules/rooms.js";
-
 import { logEvent } from "../util/logger.js";
+import logger from "../util/logger.js";
+import fs from "fs";
+import { encrypt, decrypt } from "../util/crypto.js";
+
+
+
+// Ruta relativa a la carpeta actual
+const logsPath = path.resolve("../server", "logs");
+
+if (!fs.existsSync(logsPath)) {
+  fs.mkdirSync(logsPath, { recursive: true });
+  logger.info(`Carpeta creada: ${logsPath}`);
+} else {
+  logger.info(`Carpeta existente: ${logsPath}`);
+}
+
+
+// === IP LOCAL DINÁMICA ===
+const getLocalIp = () => {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1'; // fallback
+};
+
+
+const localIp = getLocalIp();
+const apiPort = "4000";
+logger.info(`IP local del servidor: ${localIp}`);
+
+const baseURL = `http://${localIp}:${apiPort}/`;
+
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const APP_PORT = process.env.PORT_HTTP || 4000;
+const APP_PORT = process.env.PORT_HTTP || apiPort;
 
 const app = express();
 app.use(express.json());
@@ -48,7 +83,15 @@ app.use((req, res, next) => {
 
 //login
 app.post("/login", (req, res) => {
-  const { user, password } = req.body;
+  const { encryptedUser, encryptedPassword } = req.body;
+  logger.info("Pasó por la etapa de encriptación", { encryptedUser, encryptedPassword });
+
+if (!encryptedUser || !encryptedPassword)
+  return res.status(400).json({ error: "Datos cifrados requeridos" });
+
+const user = decrypt(encryptedUser);
+const password = decrypt(encryptedPassword);
+
   if (!user || !password)
     return res.status(400).json({ error: "Usuario y contraseña requeridos" });
 
@@ -123,10 +166,10 @@ wss.on("connection", (ws, req) => {
         handleCommand(ws, client, msgObj.command, roomsManager);
         break;
       case "private":
-        handlePrivateMessage(ws, client, msgObj.to, msgObj.body);
+        handlePrivateMessage(ws, client, msgObj.to, msgObj.body, msgObj.messageHash);
         break;
       case "message":
-        handleBroadcastMessage(ws, client, msgObj.body);
+        handleBroadcastMessage(ws, client, msgObj.body, msgObj.messageHash);
         break;
       default:
         ws.send(
@@ -138,7 +181,7 @@ wss.on("connection", (ws, req) => {
   ws.on("close", () => {
     const client = getClientInfo(ws);
     if (client) {
-      console.log(`🔌 Usuario desconectado: ${client.user}`);
+      logEvent("DISCONNECT", client.user, null, null, `Usuario desconectado: ${client.user}`);
       if (client.user) roomsManager.cleanupUserRooms(client.user);
       if (client.room) roomsManager.leaveRoom(ws, client, false);
     }
@@ -151,5 +194,5 @@ wss.on("connection", (ws, req) => {
 });
 
 server.listen(APP_PORT, () => {
-  console.log(chalk.green(`Servidor listo → http://localhost:${APP_PORT}`));
+  logger.info(`Servidor listo → http://${localIp}:${APP_PORT}`);
 });

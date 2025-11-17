@@ -3,10 +3,12 @@ import {
   getClientInfo,
   setUser,
 } from "../client/clients-connect.js";
+import { logEvent } from "../util/logger.js";
 
 // Procesa comandos
 export function handleCommand(ws, client, command, roomsManager) {
   const [baseCommand, ...args] = command.split(" ");
+  logEvent("COMMAND", client.user, null, null, `Comando recibido: ${command}`);
 
   switch (baseCommand) {
     case "/lista":
@@ -38,10 +40,12 @@ export function handleCommand(ws, client, command, roomsManager) {
     case "/quit":
       ws.send(JSON.stringify({ type: "system", body: "Desconectando..." }));
       ws.close();
+      logEvent("DISCONNECT", client.user, null, null, "Usuario solicitó /quit");
       break;
 
     default:
       ws.send(JSON.stringify({ type: "error", body: "Comando desconocido" }));
+      logEvent("ERROR", client.user, null, null, `Comando desconocido: ${command}`);
   }
 }
 

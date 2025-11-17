@@ -1,4 +1,5 @@
 import { getClientsInRoom, setRoom } from "../client/clients-connect.js";
+import { logEvent } from "../util/logger.js";
 
 export const rooms = new Map();
 
@@ -10,15 +11,13 @@ export function joinRoom(ws, client, roomName) {
 
   if (!rooms.has(roomName)) {
     rooms.set(roomName, new Set());
-    console.log(`✅ Sala creada: ${roomName}`);
+    logEvent("ROOM_CREATE", client.user, null, null, `Sala creada: ${roomName}`);
   }
 
   rooms.get(roomName).add(client.user);
   setRoom(ws, roomName);
 
-  console.log(`👤 ${client.user} se unió a ${roomName}`, [
-    ...rooms.get(roomName),
-  ]);
+  logEvent("ROOM_JOIN", client.user, null, null, `Se unió a sala ${roomName}`);
   ws.send(JSON.stringify({ type: "system", body: `Unido a sala ${roomName}` }));
 
   notifyRoomUsers(roomName, `${client.user} se unió a la sala`, ws);
@@ -34,16 +33,16 @@ export function leaveRoom(ws, client, notifyOthers = true) {
   }
 
   const room = client.room;
-  console.log(`👤 ${client.user} saliendo de ${room}`);
+  logEvent("ROOM_LEAVE", client.user, null, null, `Saliendo de ${room}`);
 
   const users = rooms.get(room);
   if (users) {
     users.delete(client.user);
-    console.log(`📊 Usuarios restantes en ${room}:`, [...users]);
+    logEvent("ROOM_STATE", client.user, null, null, `Usuarios en ${room}: ${[...users]}`);
 
     if (users.size === 0) {
       rooms.delete(room);
-      console.log(`🗑️ Sala ${room} eliminada por estar vacía`);
+      logEvent("ROOM_DELETE", null, null, null, `Sala ${room} eliminada (vacía)`);
     }
   }
 
@@ -59,14 +58,14 @@ export function leaveRoom(ws, client, notifyOthers = true) {
 
 // Limpia al usuario de todas las salas (desconexión)
 export function cleanupUserRooms(user) {
-  console.log(`🧹 Limpiando salas del usuario: ${user}`);
+  logEvent("ROOM_CLEANUP", user, null, null, `Limpiando salas de: ${user}`);
 
   for (const [roomName, users] of rooms.entries()) {
     if (users.delete(user)) {
-      console.log(`👤 ${user} removido de ${roomName}`);
+      logEvent("ROOM_STATE", user, null, null, `Removido ${user} de ${roomName}`);
       if (users.size === 0) {
         rooms.delete(roomName);
-        console.log(`🗑️ Sala ${roomName} eliminada por estar vacía`);
+        logEvent("ROOM_DELETE", null, null, null, `Sala ${roomName} eliminada por estar vacía`);
       }
     }
   }
@@ -78,16 +77,14 @@ export function getRoomList() {
     .map(([name, users]) => `${name} (${users.size})`)
     .join("\n");
 
-  console.log(`📋 Lista de salas actual:`, [...rooms.entries()]);
+  logEvent("ROOM_LIST", null, null, null, `Lista de salas: ${[...rooms.entries()]}`);
   return roomList || "No hay salas activas";
 }
 
 // Notifica a todos los usuarios de una sala
 function notifyRoomUsers(room, message, excludeWs = null) {
   const clientsInRoom = getClientsInRoom(room);
-  console.log(
-    `📢 Notificando a ${clientsInRoom.length} usuarios en ${room}: ${message}`
-  );
+  logEvent("NOTIFY", null, null, null, `Notificando ${clientsInRoom.length} usuarios en ${room}: ${message}`);
 
   for (const c of clientsInRoom) {
     if (c.socket !== excludeWs) {
