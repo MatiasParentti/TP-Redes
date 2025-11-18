@@ -7,9 +7,12 @@ export const encrypt = (text) => {
 };
 
 export const decrypt = (cipherText) => {
+  if (!cipherText || typeof cipherText !== "string") return null;
+  
   try {
     const bytes = CryptoJS.AES.decrypt(cipherText, secretKey);
-    return bytes.toString(CryptoJS.enc.Utf8);
+    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+    return decrypted && decrypted.length > 0 ? decrypted : null;
   } catch (e) {
     return null;
   }
