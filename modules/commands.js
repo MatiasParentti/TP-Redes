@@ -5,7 +5,7 @@ import {
 } from "../client/clients-connect.js";
 import { logEvent } from "../util/logger.js";
 
-// Procesa comandos
+//comandos
 export function handleCommand(ws, client, command, roomsManager) {
   const [baseCommand, ...args] = command.split(" ");
   logEvent("COMMAND", client.user, null, null, `Comando recibido: ${command}`);
@@ -45,11 +45,17 @@ export function handleCommand(ws, client, command, roomsManager) {
 
     default:
       ws.send(JSON.stringify({ type: "error", body: "Comando desconocido" }));
-      logEvent("ERROR", client.user, null, null, `Comando desconocido: ${command}`);
+      logEvent(
+        "ERROR",
+        client.user,
+        null,
+        null,
+        `Comando desconocido: ${command}`
+      );
   }
 }
 
-// Lista todos los usuarios conectados
+//listar usuarios
 function handleListUsers(ws) {
   const names = getClients()
     .map((s) => getClientInfo(s).user || "anon")
@@ -57,13 +63,13 @@ function handleListUsers(ws) {
   ws.send(JSON.stringify({ type: "system", body: `Usuarios: ${names}` }));
 }
 
-// Lista todas las salas activas
+//listar salas disponibles
 function handleListRooms(ws, roomsManager) {
   const list = roomsManager.getRoomList();
   ws.send(JSON.stringify({ type: "system", body: list }));
 }
 
-// Cambia el apodo del usuario
+//cambiar apodo
 function handleNickChange(ws, client, newNick, rooms) {
   const nickInUse = getClients().some((s) => {
     const info = getClientInfo(s);

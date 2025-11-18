@@ -6,8 +6,14 @@ import {
 import { logEvent } from "../util/logger.js";
 import { decrypt } from "../util/crypto.js";
 
-// Enviar mensaje privado a un usuario
-export function handlePrivateMessage(ws, client, targetUser, body, messageHash) {
+//enviar mensaje privado
+export function handlePrivateMessage(
+  ws,
+  client,
+  targetUser,
+  body,
+  messageHash
+) {
   if (!targetUser || !body) {
     ws.send(
       JSON.stringify({ type: "error", body: "Uso: /msg <usuario> <mensaje>" })
@@ -16,29 +22,41 @@ export function handlePrivateMessage(ws, client, targetUser, body, messageHash) 
   }
 
   let userFound = false;
+
   for (const s of getClients()) {
-    const inf = getClientInfo(s);
-    if (inf.user === targetUser) {
+    const info = getClientInfo(s);
+    if (info.user === targetUser) {
       userFound = true;
-      s.send(JSON.stringify({ type: "private", from: client.user, body, messageHash }));
+      s.send(
+        JSON.stringify({
+          type: "private",
+          from: client.user,
+          body,
+          messageHash,
+        })
+      );
     }
   }
 
   if (userFound) {
-    // attempt to decrypt body to obtain plaintext for logging
-    let plain = null;
-    try {
-      const candidate = body && typeof body === "string" && body.startsWith("ENC:") ? body.slice(4) : body;
-      plain = decrypt(candidate) || null;
-    } catch (e) {
-      plain = null;
-    }
+    const candidate =
+      typeof body === "string" && body.startsWith("ENC:")
+        ? body.slice(4)
+        : body;
 
+    const plain = decrypt(candidate) || null;
     const messageForLog = plain || `[Privado] ${body}`;
-    logEvent("MESSAGE", client.user, null, null, messageForLog, messageHash, body);
-  }
 
-  if (!userFound) {
+    logEvent(
+      "MESSAGE",
+      client.user,
+      null,
+      null,
+      messageForLog,
+      messageHash,
+      body
+    );
+  } else {
     ws.send(
       JSON.stringify({
         type: "error",
@@ -48,7 +66,7 @@ export function handlePrivateMessage(ws, client, targetUser, body, messageHash) 
   }
 }
 
-// Enviar mensaje público a la sala
+//mensaje publico a sala
 export function handleBroadcastMessage(ws, client, body, messageHash) {
   const room = client.room;
 
@@ -66,17 +84,22 @@ export function handleBroadcastMessage(ws, client, body, messageHash) {
     ws.send(JSON.stringify({ type: "error", body: "Mensaje vacío" }));
     return;
   }
-  // Log the broadcast message (structured). Decrypt to log plaintext and record provided messageHash.
-  let plain = null;
-  try {
-    const candidate = body && typeof body === "string" && body.startsWith("ENC:") ? body.slice(4) : body;
-    plain = decrypt(candidate) || null;
-  } catch (e) {
-    plain = null;
-  }
 
+  const candidate =
+    typeof body === "string" && body.startsWith("ENC:") ? body.slice(4) : body;
+
+  const plain = decrypt(candidate) || null;
   const messageForLog = plain || `[Room:${room}] ${body}`;
-  logEvent("MESSAGE", client.user, null, null, messageForLog, messageHash, body);
+
+  logEvent(
+    "MESSAGE",
+    client.user,
+    null,
+    null,
+    messageForLog,
+    messageHash,
+    body
+  );
 
   for (const c of getClientsInRoom(room)) {
     if (c.socket !== ws) {

@@ -1,11 +1,12 @@
 import express from "express";
 import http from "http";
 import dotenv from "dotenv";
-import chalk from "chalk";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
-import os from 'os';
+import os from "os";
+import fs from "fs";
+
 import {
   addClient,
   removeClient,
@@ -27,14 +28,17 @@ import {
 } from "../modules/rooms.js";
 import { logEvent } from "../util/logger.js";
 import logger from "../util/logger.js";
-import fs from "fs";
-import { encrypt, decrypt } from "../util/crypto.js";
+import { decrypt } from "../util/crypto.js";
 
+// config inicial
+dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const APP_PORT = process.env.PORT_HTTP || "4000";
 
-// Ruta relativa a la carpeta actual
+//carpeta log
 const logsPath = path.resolve("../server", "logs");
-
 if (!fs.existsSync(logsPath)) {
   fs.mkdirSync(logsPath, { recursive: true });
   logger.info(`Carpeta creada: ${logsPath}`);
@@ -42,33 +46,19 @@ if (!fs.existsSync(logsPath)) {
   logger.info(`Carpeta existente: ${logsPath}`);
 }
 
-
-// === IP LOCAL DINÁMICA ===
+// ip local del servidor
 const getLocalIp = () => {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address;
-      }
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
     }
   }
-  return '127.0.0.1'; // fallback
+  return "127.0.0.1";
 };
 
-
 const localIp = getLocalIp();
-const apiPort = "4000";
 logger.info(`IP local del servidor: ${localIp}`);
-
-const baseURL = `http://${localIp}:${apiPort}/`;
-
-
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const APP_PORT = process.env.PORT_HTTP || apiPort;
 
 const app = express();
 app.use(express.json());
@@ -81,16 +71,21 @@ app.use((req, res, next) => {
   next();
 });
 
-//login
+//Rutas
+
+//Login
 app.post("/login", (req, res) => {
   const { encryptedUser, encryptedPassword } = req.body;
-  logger.info("Pasó por la etapa de encriptación", { encryptedUser, encryptedPassword });
+  logger.info("Pasó por la etapa de encriptación", {
+    encryptedUser,
+    encryptedPassword,
+  });
 
-if (!encryptedUser || !encryptedPassword)
-  return res.status(400).json({ error: "Datos cifrados requeridos" });
+  if (!encryptedUser || !encryptedPassword)
+    return res.status(400).json({ error: "Datos cifrados requeridos" });
 
-const user = decrypt(encryptedUser);
-const password = decrypt(encryptedPassword);
+  const user = decrypt(encryptedUser);
+  const password = decrypt(encryptedPassword);
 
   if (!user || !password)
     return res.status(400).json({ error: "Usuario y contraseña requeridos" });
@@ -101,7 +96,7 @@ const password = decrypt(encryptedPassword);
   res.json({ token });
 });
 
-// Token JWT
+// Verificación de token JWT
 app.post("/token/verify", (req, res) => {
   const { token } = req.body;
   res.json(handleAuth.verifyToken(token));
@@ -109,10 +104,9 @@ app.post("/token/verify", (req, res) => {
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
-
 handleAuth.init(process.env.JWT_SECRET);
 
-// salas x comando
+// Manejador de salas
 const roomsManager = {
   rooms,
   joinRoom,
@@ -139,7 +133,6 @@ wss.on("connection", (ws, req) => {
 
   ws.on("message", (raw) => {
     let msgObj;
-
     try {
       msgObj = JSON.parse(raw.toString());
     } catch {
@@ -166,7 +159,13 @@ wss.on("connection", (ws, req) => {
         handleCommand(ws, client, msgObj.command, roomsManager);
         break;
       case "private":
-        handlePrivateMessage(ws, client, msgObj.to, msgObj.body, msgObj.messageHash);
+        handlePrivateMessage(
+          ws,
+          client,
+          msgObj.to,
+          msgObj.body,
+          msgObj.messageHash
+        );
         break;
       case "message":
         handleBroadcastMessage(ws, client, msgObj.body, msgObj.messageHash);
@@ -181,7 +180,13 @@ wss.on("connection", (ws, req) => {
   ws.on("close", () => {
     const client = getClientInfo(ws);
     if (client) {
-      logEvent("DISCONNECT", client.user, null, null, `Usuario desconectado: ${client.user}`);
+      logEvent(
+        "DISCONNECT",
+        client.user,
+        null,
+        null,
+        `Usuario desconectado: ${client.user}`
+      );
       if (client.user) roomsManager.cleanupUserRooms(client.user);
       if (client.room) roomsManager.leaveRoom(ws, client, false);
     }
@@ -193,6 +198,7 @@ wss.on("connection", (ws, req) => {
   });
 });
 
+// Iniciar servidor
 server.listen(APP_PORT, () => {
   logger.info(`Servidor listo → http://${localIp}:${APP_PORT}`);
 });

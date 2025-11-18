@@ -3,47 +3,47 @@ import { logEvent } from "../util/logger.js";
 // Mapa de clientes conectados
 const clients = new Map();
 
-// Agrega un nuevo cliente al mapa
+//Agrega un nuevo cliente al mapa con estado inicial sin usuario ni sala.
 export function addClient(ws) {
   clients.set(ws, { user: null, room: null });
-  // registro estructurado: nuevo socket añadido (sin usuario todavía)
   logEvent("CONNECT", null, null, null, "Nuevo cliente añadido al mapa");
 }
 
-// Elimina un cliente del mapa
+//Elimina un cliente del mapa y registra el evento.
 export function removeClient(ws) {
   const info = clients.get(ws);
   clients.delete(ws);
-  if (info?.user) {
-    logEvent("DISCONNECT", info.user, null, null, "Cliente eliminado del mapa");
-  } else {
-    logEvent("DISCONNECT", null, null, null, "Socket eliminado del mapa");
-  }
+
+  const mensaje = info?.user
+    ? "Cliente eliminado del mapa"
+    : "Socket eliminado del mapa";
+
+  logEvent("DISCONNECT", info?.user || null, null, null, mensaje);
 }
 
-// Asigna nombre de usuario al cliente
+//nombre de usuario a un cliente
 export function setUser(ws, user) {
   const c = clients.get(ws);
   if (c) c.user = user;
 }
 
-// Asigna sala actual al cliente
+//asignar sala
 export function setRoom(ws, room) {
   const c = clients.get(ws);
   if (c) c.room = room;
 }
 
-// Devuelve todos los sockets conectados
+//todos los sockets guardados
 export function getClients() {
   return [...clients.keys()];
 }
 
-// Devuelve la info del cliente asociado al socket
+//info de un cliente asociado a un socket
 export function getClientInfo(ws) {
   return clients.get(ws);
 }
 
-// Devuelve los clientes que están en una sala específica
+//todos los clientes de una sala
 export function getClientsInRoom(room) {
   return [...clients.entries()]
     .filter(([, c]) => c.room === room)

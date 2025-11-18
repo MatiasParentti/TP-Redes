@@ -7,18 +7,18 @@ import crypto from "crypto";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Put logs under server/logs to match server.js usage
+// Ruta de logs
 const logsDir = path.resolve(__dirname, "..", "server", "logs");
 if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
 const chatLogFile = path.join(logsDir, "chat.log");
 const errorLogFile = path.join(logsDir, "error.log");
 
+// Configuración del logger
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.combine(
     winston.format.timestamp(),
-    // JSON for file transports
     winston.format.json()
   ),
   defaultMeta: { service: "tp-redes-chat" },
@@ -28,7 +28,7 @@ const logger = winston.createLogger({
   ],
 });
 
-// Console logging with colors and readable output during development
+// salida por consola
 if (process.env.NODE_ENV !== "production") {
   logger.add(
     new winston.transports.Console({
@@ -44,7 +44,16 @@ if (process.env.NODE_ENV !== "production") {
   );
 }
 
-export function logEvent(type, user, ip, port, msg = "", messageHashOverride = null, ciphertext = null) {
+//logs estructurados
+export function logEvent(
+  type,
+  user,
+  ip,
+  port,
+  msg = "",
+  messageHashOverride = null,
+  ciphertext = null
+) {
   const levelMap = {
     CONNECT: "info",
     AUTH: "info",
@@ -55,29 +64,19 @@ export function logEvent(type, user, ip, port, msg = "", messageHashOverride = n
   };
 
   const level = levelMap[type] || "info";
+  const messageText = msg || type;
 
   const logMeta = {
     type,
     user: user || "anon",
     ip: ip || null,
     port: port || null,
+    messageHash:
+      messageHashOverride ||
+      crypto.createHash("sha256").update(messageText, "utf8").digest("hex"),
+    ...(ciphertext && { ciphertext }),
   };
 
-  // Add SHA-256 hash of message so systems can compare without exposing storage-only hashes
-  const messageText = msg || type;
-  if (messageHashOverride) {
-    logMeta.messageHash = messageHashOverride;
-  } else {
-    try {
-      const hash = crypto.createHash("sha256").update(messageText, "utf8").digest("hex");
-      logMeta.messageHash = hash;
-    } catch (e) {
-      // If hashing fails, continue without a hash
-    }
-  }
-
-  // Structured log: include cleartext message and metadata (including messageHash)
-  if (ciphertext) logMeta.ciphertext = ciphertext;
   logger.log({ level, message: messageText, ...logMeta });
 }
 
